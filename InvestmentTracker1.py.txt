@@ -1,0 +1,97 @@
+
+
+import matplotlib.pyplot as plt
+import yfinance as yf
+import pandas as pd
+from datetime import date, timedelta
+from tkinter import *
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+def get_nearest_trading_day(ticker, target_date):
+    #Returns the nearest trading day for the given ticker and target_date.
+    target_date = pd.to_datetime(target_date)
+    start_date = (target_date - timedelta(days=7)).strftime('%Y-%m-%d')
+    end_date = (target_date + timedelta(days=7)).strftime('%Y-%m-%d')
+    #download data from inputs or show an error
+    data = yf.download(ticker, start=start_date, end=end_date)
+    if data.empty:
+        raise ValueError(f"No trading data available for the range {start_date} to {end_date}")
+    
+    nearest_date = data.index.asof(target_date)
+    return nearest_date
+
+def stock():
+    #do the following code unless an exception is thrown e.g. an incorrect ticker
+    try:
+        #receive inputs fron interface and format them corectly
+        ticker = tButton.get().strip().upper()
+        investment_date_input = dButton.get().strip()
+        #getting todays date
+        end_date_input = date.today().strftime('%Y-%m-%d')
+        amount_invested = float(mButton.get().strip())
+        
+        # Find nearest trading days
+        investment_date = get_nearest_trading_day(ticker, investment_date_input)
+        end_date = get_nearest_trading_day(ticker, end_date_input)
+        
+        # Fetch the stock data
+        data = yf.download(ticker, start=investment_date, end=end_date + timedelta(days=1))
+        
+        bought_price = data.loc[investment_date, "Adj Close"]
+        new_price = data.loc[end_date, "Adj Close"]
+        
+        amount_of_stocks = amount_invested / bought_price
+        current_value = amount_of_stocks * new_price
+        ROI = ((new_price - bought_price) / bought_price) * 100
+        
+        # Create a graph
+        fig = Figure(figsize=(10, 4), dpi=100)
+        plot = fig.add_subplot(1, 1, 1)
+        data["Adj Close"].plot(ax=plot)
+        plot.set_title(f"Adjusted Close Price of {ticker}", fontsize=12)
+        plot.set_ylabel('Price', fontsize=10)
+        plot.set_xlabel('Year', fontsize=10)
+        plot.grid(which="major", color='k', linestyle='-.', linewidth=0.5)
+        
+        # Put the graph into the tkinter window
+        graph = FigureCanvasTkAgg(fig, master=interface)
+        graph.draw()
+        graph.get_tk_widget().grid(row=5, column=0, columnspan=2, padx=10, pady=10)
+        #labels explaining key metrics
+        Label(interface, text=f"Bought Price on {investment_date.date()}: £{bought_price:.2f}").grid(row=6, sticky=W)
+        Label(interface, text=f"Current Price on {end_date.date()}: {new_price:.2f}").grid(row=7, sticky=W)
+        Label(interface, text=f"You own {amount_of_stocks:.2f} shares.").grid(row=8, sticky=W)
+        Label(interface, text=f"Current Value: ${current_value:.2f}").grid(row=9, sticky=W)
+        Label(interface, text=f"ROI: {ROI:.2f}%").grid(row=10, sticky=W)
+    #error message
+    except Exception as e:
+        Label(interface, text=f"Error: {e}").grid(row=11, sticky=W)
+
+#create tkinter interface window
+interface = Tk()
+interface.title("Stock Investment Tracker")
+#tell user what infor to put into text boxes
+Label(interface, text="Company ticker:").grid(row=0, sticky=W)
+Label(interface, text="Date of purchase (YYYY-MM-DD):").grid(row=1, sticky=W)
+Label(interface, text="Amount invested:").grid(row=2, sticky=W)
+
+#text box bode
+tButton = Entry(interface)
+tButton.grid(row=0, column=1)
+
+dButton = Entry(interface)
+dButton.grid(row=1, column=1)
+
+mButton = Entry(interface)
+mButton.grid(row=2, column=1)
+
+#show button
+showGraph = Button(interface, text="Show", command=stock)
+showGraph.grid(row=4, column=0, columnspan=2, padx=5, pady=5)
+
+#run the interface
+interface.mainloop()
+
+
+
